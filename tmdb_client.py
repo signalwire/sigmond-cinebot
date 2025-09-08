@@ -928,3 +928,293 @@ class TMDBClient:
         
         self._set_cache(cache_key, results, ttl=86400)
         return results
+    
+    # ============= NEW ENHANCED METHODS =============
+    
+    def get_alternative_titles(self, content_id: int, content_type: str = "movie") -> Dict[str, Any]:
+        """Get alternative titles for a movie or TV show"""
+        cache_key = self._get_cache_key(f"{content_type}_alt_titles", content_id=content_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        if content_type == "movie":
+            movie = tmdb.Movie(content_id)
+            titles = movie.alternative_titles()
+        else:
+            tv = tmdb.TV(content_id)
+            titles = tv.alternative_titles()
+        
+        results = {
+            "id": content_id,
+            "titles": titles.get("titles", titles.get("results", []))
+        }
+        
+        self._set_cache(cache_key, results, ttl=604800)  # 1 week cache
+        return results
+    
+    def get_collection_details(self, collection_id: int) -> Dict[str, Any]:
+        """Get details about a movie collection/franchise"""
+        cache_key = self._get_cache_key("collection", collection_id=collection_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        collection = tmdb.Collection(collection_id)
+        info = collection.info()
+        
+        results = {
+            "id": info["id"],
+            "name": info["name"],
+            "overview": info.get("overview", ""),
+            "poster_path": self.get_poster_url(info.get("poster_path", "")),
+            "backdrop_path": self.get_poster_url(info.get("backdrop_path", ""), "w1280"),
+            "parts": sorted(info.get("parts", []), key=lambda x: x.get("release_date", "") or "")
+        }
+        
+        self._set_cache(cache_key, results, ttl=86400)  # 1 day cache
+        return results
+    
+    def get_keywords_for_content(self, content_id: int, content_type: str = "movie") -> Dict[str, Any]:
+        """Get keywords associated with a movie or TV show"""
+        cache_key = self._get_cache_key(f"{content_type}_keywords", content_id=content_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        if content_type == "movie":
+            movie = tmdb.Movie(content_id)
+            keywords = movie.keywords()
+        else:
+            tv = tmdb.TV(content_id)
+            keywords = tv.keywords()
+        
+        results = {
+            "id": content_id,
+            "keywords": keywords.get("keywords", keywords.get("results", []))
+        }
+        
+        self._set_cache(cache_key, results, ttl=604800)  # 1 week cache
+        return results
+    
+    def get_release_dates(self, movie_id: int) -> Dict[str, Any]:
+        """Get regional release dates and certifications for a movie"""
+        cache_key = self._get_cache_key("release_dates", movie_id=movie_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        movie = tmdb.Movie(movie_id)
+        releases = movie.release_dates()
+        
+        # Organize by region
+        results = {
+            "id": movie_id,
+            "results": {}
+        }
+        
+        for region in releases.get("results", []):
+            country = region["iso_3166_1"]
+            results["results"][country] = {
+                "release_dates": region.get("release_dates", []),
+                "certification": next(
+                    (r.get("certification") for r in region.get("release_dates", []) 
+                     if r.get("certification")), 
+                    None
+                )
+            }
+        
+        self._set_cache(cache_key, results, ttl=86400)  # 1 day cache
+        return results
+    
+    def get_now_playing(self, region: str = "US", page: int = 1) -> Dict[str, Any]:
+        """Get movies currently playing in theaters"""
+        cache_key = self._get_cache_key("now_playing", region=region, page=page)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        movies = tmdb.Movies()
+        now_playing = movies.now_playing(region=region, page=page)
+        
+        results = {
+            "results": [],
+            "dates": now_playing.get("dates", {}),
+            "total_results": now_playing.get("total_results", 0)
+        }
+        
+        for movie in now_playing.get("results", []):
+            results["results"].append({
+                "id": movie["id"],
+                "title": movie["title"],
+                "release_date": movie.get("release_date", ""),
+                "poster_path": self.get_poster_url(movie.get("poster_path", "")),
+                "backdrop_path": self.get_poster_url(movie.get("backdrop_path", ""), "w1280"),
+                "overview": movie.get("overview", ""),
+                "vote_average": movie.get("vote_average", 0),
+                "popularity": movie.get("popularity", 0)
+            })
+        
+        self._set_cache(cache_key, results, ttl=3600)  # 1 hour cache for current releases
+        return results
+    
+    def get_recommendations(self, content_id: int, content_type: str = "movie") -> Dict[str, Any]:
+        """Get ML-based recommendations (better than similar)"""
+        cache_key = self._get_cache_key(f"{content_type}_recommendations", content_id=content_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        if content_type == "movie":
+            movie = tmdb.Movie(content_id)
+            recs = movie.recommendations()
+        else:
+            tv = tmdb.TV(content_id)
+            recs = tv.recommendations()
+        
+        results = {
+            "results": [],
+            "total_results": recs.get("total_results", 0)
+        }
+        
+        for item in recs.get("results", [])[:20]:  # Get top 20 recommendations
+            if content_type == "movie":
+                results["results"].append({
+                    "id": item["id"],
+                    "title": item["title"],
+                    "release_date": item.get("release_date", ""),
+                    "poster_path": self.get_poster_url(item.get("poster_path", "")),
+                    "overview": item.get("overview", "")[:200],
+                    "vote_average": item.get("vote_average", 0)
+                })
+            else:
+                results["results"].append({
+                    "id": item["id"],
+                    "name": item["name"],
+                    "first_air_date": item.get("first_air_date", ""),
+                    "poster_path": self.get_poster_url(item.get("poster_path", "")),
+                    "overview": item.get("overview", "")[:200],
+                    "vote_average": item.get("vote_average", 0)
+                })
+        
+        self._set_cache(cache_key, results, ttl=86400)  # 1 day cache
+        return results
+    
+    def get_next_episode(self, tv_id: int) -> Dict[str, Any]:
+        """Get the next episode to air for a TV show"""
+        cache_key = self._get_cache_key("next_episode", tv_id=tv_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        tv = tmdb.TV(tv_id)
+        info = tv.info(append_to_response="next_episode_to_air,last_episode_to_air")
+        
+        results = {
+            "id": tv_id,
+            "next_episode": None,
+            "last_episode": None
+        }
+        
+        if info.get("next_episode_to_air"):
+            next_ep = info["next_episode_to_air"]
+            results["next_episode"] = {
+                "id": next_ep.get("id"),
+                "name": next_ep.get("name"),
+                "season_number": next_ep.get("season_number"),
+                "episode_number": next_ep.get("episode_number"),
+                "air_date": next_ep.get("air_date"),
+                "overview": next_ep.get("overview", ""),
+                "still_path": self.get_poster_url(next_ep.get("still_path", ""), "w780")
+            }
+        
+        if info.get("last_episode_to_air"):
+            last_ep = info["last_episode_to_air"]
+            results["last_episode"] = {
+                "id": last_ep.get("id"),
+                "name": last_ep.get("name"),
+                "season_number": last_ep.get("season_number"),
+                "episode_number": last_ep.get("episode_number"),
+                "air_date": last_ep.get("air_date"),
+                "overview": last_ep.get("overview", ""),
+                "still_path": self.get_poster_url(last_ep.get("still_path", ""), "w780")
+            }
+        
+        self._set_cache(cache_key, results, ttl=3600)  # 1 hour cache for episode info
+        return results
+    
+    def get_external_ids(self, content_id: int, content_type: str = "movie") -> Dict[str, Any]:
+        """Get external IDs (IMDB, TVDB, etc.) for cross-referencing"""
+        cache_key = self._get_cache_key(f"{content_type}_external_ids", content_id=content_id)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        if content_type == "movie":
+            movie = tmdb.Movie(content_id)
+            ids = movie.external_ids()
+        else:
+            tv = tmdb.TV(content_id)
+            ids = tv.external_ids()
+        
+        results = {
+            "id": content_id,
+            "imdb_id": ids.get("imdb_id"),
+            "facebook_id": ids.get("facebook_id"),
+            "instagram_id": ids.get("instagram_id"),
+            "twitter_id": ids.get("twitter_id")
+        }
+        
+        if content_type == "tv":
+            results["tvdb_id"] = ids.get("tvdb_id")
+            results["tvrage_id"] = ids.get("tvrage_id")
+        
+        self._set_cache(cache_key, results, ttl=604800)  # 1 week cache
+        return results
+    
+    def find_by_external_id(self, external_id: str, source: str = "imdb_id") -> Dict[str, Any]:
+        """Find content by external ID (e.g., IMDB ID)"""
+        cache_key = self._get_cache_key("find_external", external_id=external_id, source=source)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        find = tmdb.Find(external_id)
+        results = find.info(external_source=source)
+        
+        self._set_cache(cache_key, results, ttl=86400)  # 1 day cache
+        return results
+    
+    def discover_with_keywords(self, keyword_ids: list, content_type: str = "movie", 
+                               page: int = 1, **kwargs) -> Dict[str, Any]:
+        """Discover content using keyword IDs"""
+        cache_key = self._get_cache_key(
+            f"discover_{content_type}_keywords", 
+            keywords=",".join(map(str, keyword_ids)),
+            page=page,
+            **kwargs
+        )
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+        
+        discover = tmdb.Discover()
+        
+        params = {
+            "with_keywords": ",".join(map(str, keyword_ids)),
+            "page": page,
+            "sort_by": kwargs.get("sort_by", "popularity.desc")
+        }
+        
+        # Add any additional filters
+        for key, value in kwargs.items():
+            if key not in ["sort_by"] and value is not None:
+                params[key] = value
+        
+        if content_type == "movie":
+            results = discover.movie(**params)
+        else:
+            results = discover.tv(**params)
+        
+        self._set_cache(cache_key, results, ttl=3600)  # 1 hour cache
+        return results

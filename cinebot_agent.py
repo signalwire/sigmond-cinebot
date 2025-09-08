@@ -107,7 +107,7 @@ class MovieAgent(AgentBase):
             .set_functions([
                 "multi_search", "search_movie", "search_tv", "search_person",
                 "get_trending", "get_trending_tv", "get_movies_by_genre",
-                "discover_content", "clear_display"
+                "get_now_playing", "discover_content", "clear_display"
             ]) \
             .set_valid_steps(["browsing", "movie_details", "tv_details", "person_details"])
         
@@ -276,6 +276,17 @@ class MovieAgent(AgentBase):
                 results = self.tmdb.search_movie(search_query)
                 logger.info(f"TMDB returned {len(results.get('results', []))} results for '{search_query}'")
                 self.current_search_results = results["results"]
+                
+                # If no results, try alternative search strategies
+                if not results["results"] and len(search_query) > 2:
+                    logger.info(f"No results for '{search_query}', trying alternative search strategies")
+                    
+                    # Try searching without common words
+                    alt_query = re.sub(r'\b(the|a|an)\b', '', search_query, flags=re.IGNORECASE).strip()
+                    if alt_query != search_query:
+                        results = self.tmdb.search_movie(alt_query)
+                        logger.info(f"Alternative search '{alt_query}' returned {len(results.get('results', []))} results")
+                        self.current_search_results = results["results"]
                 
                 if results["results"]:
                     # Filter by year if specified
@@ -529,7 +540,7 @@ class MovieAgent(AgentBase):
                 if details["overview"]:
                     response += f"Here's what it's about: {details['overview'][:200]}... "
                 
-                response += "Would you like to see the cast, watch the trailer, or find similar movies?"
+                response += "You can ask me to play the trailer, find similar movies, or tell you about the cast members shown on screen."
                 
                 result = SwaigFunctionResult(response=response)
                 
@@ -685,11 +696,37 @@ class MovieAgent(AgentBase):
                 
                 result = SwaigFunctionResult(response=response)
                 
-                # Send event to frontend
-                result.swml_user_event({
-                    "type": "cast_crew_display",
-                    "data": cast_crew
-                })
+                # Check if this is a different movie/show than what's currently displayed
+                # If so, send full details instead of just cast
+                should_update_full_display = False
+                if content_type == "movie" and content_id != self.current_movie_id:
+                    should_update_full_display = True
+                    self.current_movie_id = content_id
+                    self.current_tv_id = None
+                elif content_type == "tv" and content_id != self.current_tv_id:
+                    should_update_full_display = True
+                    self.current_tv_id = content_id
+                    self.current_movie_id = None
+                
+                if should_update_full_display:
+                    # Send full movie/TV details event to update entire display
+                    event_type = "movie_details" if content_type == "movie" else "tv_details"
+                    result.swml_user_event({
+                        "type": event_type,
+                        "data": details
+                    })
+                    
+                    # Also change state
+                    if content_type == "movie":
+                        result.swml_change_step("movie_details")
+                    else:
+                        result.swml_change_step("tv_details")
+                else:
+                    # Just update cast section if it's the same content
+                    result.swml_user_event({
+                        "type": "cast_crew_display",
+                        "data": cast_crew
+                    })
                 
                 return result
                 
@@ -699,6 +736,72 @@ class MovieAgent(AgentBase):
                     response="I couldn't fetch the cast information. Please try again."
                 )
                 return result
+        
+        @self.tool(
+            name="get_now_playing",
+            description="Get movies currently playing in theaters",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "region": {
+                        "type": "string",
+                        "description": "Country code (e.g., 'US', 'UK', 'CA')",
+                        "default": "US"
+                    }
+                },
+                "required": []
+            }
+        )
+        def get_now_playing(args, raw_data):
+            region = args.get("region", "US")
+            logger.info(f"get_now_playing called for region: {region}")
+            
+            try:
+                results = self.tmdb.get_now_playing(region=region)
+                
+                if results["results"]:
+                    movie_list = []
+                    self.search_result_mapping = {}  # Use same mapping as search
+                    
+                    for i, m in enumerate(results["results"][:10], 1):
+                        year = m.get('release_date', '')[:4] if m.get('release_date') else ''
+                        movie_list.append(f"{i}. '{m['title']}' ({year}) - Rating: {m['vote_average']:.1f}/10")
+                        
+                        # Store mapping for AI
+                        self.search_result_mapping[i] = {
+                            "id": m['id'],
+                            "title": m['title'],
+                            "year": year
+                        }
+                    
+                    response = f"Here are the movies currently playing in theaters"
+                    if region != "US":
+                        response += f" in {region}"
+                    response += f":\n{chr(10).join(movie_list)}\n"
+                    response += "Which movie would you like to know more about?"
+                    
+                    result = SwaigFunctionResult(response=response)
+                    
+                    # Send event to frontend
+                    result.swml_user_event({
+                        "type": "now_playing",
+                        "data": results
+                    })
+                    
+                    # Transition to browsing state
+                    result.swml_change_step("browsing")
+                    
+                    return result
+                else:
+                    return SwaigFunctionResult(
+                        response="I couldn't find any movies currently playing in theaters. Try checking trending movies instead."
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Error getting now playing: {e}")
+                return SwaigFunctionResult(
+                    response="I had trouble getting current theater listings. Let me show you trending movies instead."
+                )
         
         @self.tool(
             name="get_similar_content", 
@@ -749,15 +852,28 @@ class MovieAgent(AgentBase):
                 return result
             
             try:
-                # Get details and similar content
-                if content_type == "movie":
-                    details = self.tmdb.get_movie_details(content_id)
-                    similar = details.get("similar", [])
-                    content_name = details['title']
+                # Use the new recommendations endpoint (ML-based, better than similar)
+                recommendations = self.tmdb.get_recommendations(content_id, content_type)
+                
+                # Fallback to similar if no recommendations
+                if not recommendations.get("results"):
+                    if content_type == "movie":
+                        details = self.tmdb.get_movie_details(content_id)
+                        similar = details.get("similar", [])
+                        content_name = details['title']
+                    else:
+                        details = self.tmdb.get_tv_details(content_id)
+                        similar = details.get("similar", [])
+                        content_name = details['name']
                 else:
-                    details = self.tmdb.get_tv_details(content_id)
-                    similar = details.get("similar", [])
-                    content_name = details['name']
+                    similar = recommendations["results"]
+                    # Get content name for response
+                    if content_type == "movie":
+                        details = self.tmdb.get_movie_details(content_id)
+                        content_name = details['title']
+                    else:
+                        details = self.tmdb.get_tv_details(content_id)
+                        content_name = details['name']
                 
                 if similar:
                     # Build descriptions and store mapping for voice selection
@@ -1546,7 +1662,7 @@ class MovieAgent(AgentBase):
                 if details["overview"]:
                     response += f"Here's what it's about: {details['overview'][:200]}... "
                 
-                response += "Would you like to see the cast, explore seasons, or find similar shows?"
+                response += "You can ask me about specific seasons, find similar shows, or explore the cast members shown on screen."
                 
                 result = SwaigFunctionResult(response=response)
                 
@@ -1555,7 +1671,8 @@ class MovieAgent(AgentBase):
                     "type": "tv_details",
                     "data": details
                 }
-                logger.info(f"Sending tv_details event for '{details['name']}'")
+                logger.info(f"Sending tv_details event for '{details['name']}' with {len(details.get('seasons', []))} seasons")
+                logger.debug(f"Seasons data: {details.get('seasons', [])[:3]}")  # Log first 3 seasons for debugging
                 result.swml_user_event(event_data)
                 
                 # Transition to tv_details state (we'll need to add this)

@@ -10,16 +10,42 @@ let isContentDisplayed = false;
 // UI Elements - will be initialized after DOM loads
 let elements = {};
 
+// Placeholder images as data URLs (URL encoded to handle Unicode)
+const PLACEHOLDER_POSTER = 'data:image/svg+xml,' + encodeURIComponent(`
+<svg width="200" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="300" fill="#1a1a1a"/>
+  <rect x="60" y="110" width="80" height="80" fill="#333" rx="5"/>
+  <circle cx="100" cy="150" r="25" fill="none" stroke="#555" stroke-width="3"/>
+  <rect x="50" y="140" width="100" height="20" fill="#333"/>
+  <rect x="70" y="125" width="10" height="10" fill="#555"/>
+  <rect x="120" y="125" width="10" height="10" fill="#555"/>
+</svg>`);
+
+const PLACEHOLDER_PROFILE = 'data:image/svg+xml,' + encodeURIComponent(`
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#1a1a1a"/>
+  <circle cx="100" cy="80" r="35" fill="#333"/>
+  <path d="M 50 150 Q 100 120 150 150 L 150 180 L 50 180 Z" fill="#333"/>
+</svg>`);
+
 // Initialize the app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     console.log('CineBot app initializing...');
     initializeElements();
     attachEventListeners();
+    // Set default background on page load
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = "url('/background.png')";
+        elements.appContainer.style.backgroundSize = 'cover';
+        elements.appContainer.style.backgroundPosition = 'center';
+    }
     console.log('CineBot app initialized');
 });
 
 function initializeElements() {
     elements = {
+        // App container
+        appContainer: document.getElementById('appContainer'),
         // Connection elements
         connectBtn: document.getElementById('connectBtn'),
         hangupBtn: document.getElementById('hangupBtn'),
@@ -275,6 +301,12 @@ function handleConnected() {
 
 function handleDisconnect() {
     console.log('Disconnected');
+    
+    // Prevent multiple disconnect calls
+    if (!roomSession && !client) {
+        return;
+    }
+    
     // Hide status indicator when disconnected
     document.getElementById('connectionStatus').style.display = 'none';
     
@@ -366,6 +398,9 @@ function handleUserEvent(params) {
         case 'similar_movies':
             displaySimilarMovies(eventData.data);
             break;
+        case 'similar_movie':
+            displaySimilarMovies(eventData.data);
+            break;
         case 'genre_movies':
             displayGenreMovies(eventData.data);
             break;
@@ -374,6 +409,53 @@ function handleUserEvent(params) {
             break;
         case 'clear_display':
             clearAllDisplays();
+            break;
+        case 'tv_details':
+            displayTVDetails(eventData.data);
+            break;
+        case 'tv_search_results':
+            displayTVSearchResults(eventData.data);
+            break;
+        case 'season_details':
+            displaySeasonDetails(eventData.data);
+            break;
+        case 'trending_tv':
+            displayTrendingTV(eventData.data);
+            break;
+        case 'multi_search_results':
+            displayMultiSearchResults(eventData.data);
+            break;
+        case 'now_playing':
+            displayNowPlaying(eventData.data);
+            break;
+        case 'video_available':
+            if (eventData.data.video) {
+                playTrailer(eventData.data.video);
+            }
+            break;
+        case 'videos_available':
+            if (eventData.data.playing) {
+                playTrailer(eventData.data.playing);
+            }
+            break;
+        case 'watchlist_updated':
+            console.log('Watchlist updated:', eventData.data.watchlist);
+            // Could display a notification or update UI
+            break;
+        case 'discover_movie_results':
+            displayDiscoverResults(eventData.data, 'movie');
+            break;
+        case 'discover_tv_results':
+            displayDiscoverResults(eventData.data, 'tv');
+            break;
+        case 'similar_tv':
+            displaySimilarTV(eventData.data);
+            break;
+        case 'person_search_results':
+            displayPersonSearchResults(eventData.data);
+            break;
+        case 'genre_movies':
+            displayGenreMovies(eventData.data);
             break;
     }
 }
@@ -386,8 +468,8 @@ function displaySearchResults(data) {
     elements.searchTitle.textContent = 'Search Results';
     elements.moviesGrid.innerHTML = '';
     
-    data.results.forEach(movie => {
-        const card = createMovieCard(movie);
+    data.results.forEach((movie, index) => {
+        const card = createMovieCard(movie, index + 1);
         elements.moviesGrid.appendChild(card);
     });
     
@@ -398,6 +480,17 @@ function displaySearchResults(data) {
 function displayMovieDetails(details) {
     clearAllDisplays();
     hideAllSections();
+    
+    // Clear the default background when showing movie content
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
     
     // Set the entire page background to the movie's backdrop
     if (details.backdrop_path) {
@@ -499,6 +592,8 @@ function displayMovieDetails(details) {
 }
 
 function displayCastCrew(data) {
+    // Note: This only updates the cast section, not the full display
+    // If this is being called without movie_details, we should not clear the display
     elements.castCarousel.innerHTML = '';
     
     if (data.cast && data.cast.length > 0) {
@@ -506,7 +601,7 @@ function displayCastCrew(data) {
             const card = document.createElement('div');
             card.className = 'cast-member';
             card.innerHTML = `
-                <img src="${member.profile_path || ''}" alt="${member.name}" class="cast-photo" onerror="this.src=''">
+                <img src="${member.profile_path || PLACEHOLDER_PROFILE}" alt="${member.name}" class="cast-photo" onerror="this.src='${PLACEHOLDER_PROFILE}'">
                 <div class="cast-name">${member.name}</div>
                 <div class="cast-character">${member.character || ''}</div>
             `;
@@ -519,15 +614,83 @@ function displayCastCrew(data) {
 }
 
 function displaySimilarMovies(data) {
-    elements.similarCarousel.innerHTML = '';
+    // Clear everything and hide default background
+    clearAllDisplays();
+    hideAllSections();
     
-    if (data.movies && data.movies.length > 0) {
-        data.movies.forEach(movie => {
-            const card = createMovieCard(movie, true);
-            elements.similarCarousel.appendChild(card);
+    // Clear the default background
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    // Move agent to corner
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
+    // Show similar movies in the search results section
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'Similar Movies';
+    elements.moviesGrid.innerHTML = '';
+    
+    // Handle both data.movies and data.items formats
+    const movies = data.movies || data.items || [];
+    
+    if (movies.length > 0) {
+        movies.forEach((movie, index) => {
+            const card = createMovieCard(movie, index + 1);
+            elements.moviesGrid.appendChild(card);
         });
-        
-        elements.similarSection.classList.remove('hidden');
+    }
+}
+
+function displayNowPlaying(data) {
+    // Clear everything first
+    clearAllDisplays();
+    
+    // Clear the default background when showing now playing content
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    // Then display now playing movies
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'Now Playing in Theaters';
+    elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class name
+    
+    // Display dates if available
+    if (data.dates) {
+        const dateInfo = document.createElement('div');
+        dateInfo.className = 'date-info';
+        dateInfo.style.cssText = 'text-align: center; margin-bottom: 20px; color: rgba(255,255,255,0.7); font-size: 0.9rem;';
+        dateInfo.textContent = `Showing movies from ${new Date(data.dates.minimum).toLocaleDateString()} to ${new Date(data.dates.maximum).toLocaleDateString()}`;
+        elements.searchResults.insertBefore(dateInfo, elements.moviesGrid);
+    }
+    
+    // Display all now playing movies in a grid with position numbers
+    if (data && data.results) {
+        data.results.forEach((movie, index) => {
+            const card = createMovieCard(movie, index + 1);
+            
+            // Add "In Theaters" badge
+            const badge = document.createElement('div');
+            badge.className = 'in-theaters-badge';
+            badge.style.cssText = 'position: absolute; bottom: 10px; left: 10px; background: rgba(229, 9, 20, 0.9); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; z-index: 1;';
+            badge.textContent = 'IN THEATERS';
+            card.style.position = 'relative';
+            card.appendChild(badge);
+            
+            elements.moviesGrid.appendChild(card);
+        });
+    }
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
     }
 }
 
@@ -535,21 +698,448 @@ function displayTrending(data) {
     // Clear everything first
     clearAllDisplays();
     
+    // Clear the default background when showing trending content
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
     // Then display trending
     hideAllSections();
     elements.searchResults.classList.remove('hidden');
     elements.searchTitle.textContent = 'Trending Movies This Week';
     elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class name
     
-    // Display all trending movies in a grid
+    // Display all trending movies in a grid with position numbers
     if (data && data.results) {
-        data.results.forEach(movie => {
-            const card = createMovieCard(movie);
+        data.results.forEach((movie, index) => {
+            const card = createMovieCard(movie, index + 1);
             elements.moviesGrid.appendChild(card);
         });
     }
     
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+}
+
+// TV Show Display Functions
+function displayTVDetails(details) {
+    clearAllDisplays();
+    hideAllSections();
+    
+    // Clear the default background when showing TV content
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
+    // Set the entire page background to the TV show's backdrop
+    if (details.backdrop_path) {
+        document.body.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.8)), url(${details.backdrop_path})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundAttachment = 'fixed';
+    }
+    
+    // Set backdrop and poster
+    if (details.backdrop_path) {
+        elements.movieBackdrop.src = details.backdrop_path;
+        elements.movieBackdrop.style.display = 'block';
+    } else {
+        elements.movieBackdrop.style.display = 'none';
+    }
+    
+    if (details.poster_path) {
+        elements.moviePoster.src = details.poster_path;
+    }
+    
+    // Set TV show info (reusing movie elements since layout is similar)
+    elements.movieTitle.textContent = details.name || '';
+    elements.movieTagline.textContent = details.tagline || '';
+    
+    // Format TV-specific metadata
+    const firstAirYear = details.first_air_date ? new Date(details.first_air_date).getFullYear() : '';
+    const lastAirYear = details.last_air_date ? new Date(details.last_air_date).getFullYear() : '';
+    const yearRange = lastAirYear && lastAirYear !== firstAirYear ? `${firstAirYear}-${lastAirYear}` : firstAirYear;
+    elements.movieYear.textContent = yearRange;
+    
+    // Show comprehensive TV show runtime and season info
+    let runtimeText = [];
+    
+    // Add episode runtime if available
+    if (details.episode_run_time && Array.isArray(details.episode_run_time) && details.episode_run_time.length > 0) {
+        const avgRuntime = Math.round(details.episode_run_time.reduce((a, b) => a + b, 0) / details.episode_run_time.length);
+        runtimeText.push(`${avgRuntime} min/episode`);
+    }
+    
+    // Add season count
+    if (details.number_of_seasons) {
+        runtimeText.push(`${details.number_of_seasons} season${details.number_of_seasons !== 1 ? 's' : ''}`);
+    }
+    
+    // Add episode count
+    if (details.number_of_episodes) {
+        runtimeText.push(`${details.number_of_episodes} episodes`);
+    }
+    
+    // Set the runtime text or show status if no runtime info
+    if (runtimeText.length > 0) {
+        elements.movieRuntime.textContent = runtimeText.join(' • ');
+    } else if (details.status) {
+        elements.movieRuntime.textContent = details.status;
+    } else {
+        elements.movieRuntime.textContent = '';
+    }
+    
+    elements.movieRating.textContent = details.vote_average ? details.vote_average.toFixed(1) : 'N/A';
+    
+    // Set genres
+    elements.movieGenres.innerHTML = '';
+    if (details.genres) {
+        details.genres.forEach(genre => {
+            const genreTag = document.createElement('span');
+            genreTag.className = 'genre-tag';
+            genreTag.textContent = genre;
+            elements.movieGenres.appendChild(genreTag);
+        });
+    }
+    
+    elements.movieOverview.textContent = details.overview || '';
+    
+    // Display cast if available
+    if (details.cast && details.cast.length > 0) {
+        elements.castCarousel.innerHTML = '';
+        details.cast.slice(0, 10).forEach(member => {
+            const card = document.createElement('div');
+            card.className = 'cast-member';
+            card.innerHTML = `
+                <img src="${member.profile_path || PLACEHOLDER_PROFILE}" alt="${member.name}" class="cast-photo" onerror="this.src='${PLACEHOLDER_PROFILE}'">
+                <div class="cast-name">${member.name}</div>
+                <div class="cast-character">${member.character || ''}</div>
+            `;
+            elements.castCarousel.appendChild(card);
+        });
+        elements.castSection.classList.remove('hidden');
+    }
+    
+    // Display seasons if available (TV shows have seasons data)
+    if (details.seasons && details.seasons.length > 0) {
+        console.log(`Displaying ${details.seasons.length} seasons for TV show`);
+        
+        // Create or find seasons section
+        let seasonsSection = document.getElementById('seasonsSection');
+        if (!seasonsSection) {
+            seasonsSection = document.createElement('div');
+            seasonsSection.id = 'seasonsSection';
+            seasonsSection.className = 'seasons-section';
+            seasonsSection.innerHTML = '<h2>Seasons</h2><div class="seasons-carousel" id="seasonsCarousel"></div>';
+            // Insert after cast section or at end of movie content
+            const movieContent = document.querySelector('.movie-content');
+            if (movieContent) {
+                movieContent.appendChild(seasonsSection);
+            }
+        }
+        
+        const seasonsCarousel = document.getElementById('seasonsCarousel');
+        seasonsCarousel.innerHTML = '';
+        
+        // Sort seasons by season number and display all
+        const sortedSeasons = [...details.seasons].sort((a, b) => a.season_number - b.season_number);
+        
+        sortedSeasons.forEach((season, index) => {
+            // Only skip season 0 if it has no episodes
+            if (season.season_number === 0 && season.episode_count === 0) return;
+            
+            const seasonCard = document.createElement('div');
+            seasonCard.className = 'season-card';
+            
+            // Handle special season 0
+            const seasonLabel = season.season_number === 0 ? 'Specials' : `Season ${season.season_number}`;
+            
+            seasonCard.innerHTML = `
+                <div class="season-number">${seasonLabel}</div>
+                <div class="season-name">${season.name || seasonLabel}</div>
+                <div class="season-episodes">${season.episode_count || 0} episodes</div>
+                ${season.air_date ? `<div class="season-year">${new Date(season.air_date).getFullYear()}</div>` : ''}
+            `;
+            seasonsCarousel.appendChild(seasonCard);
+        });
+        
+        seasonsSection.classList.remove('hidden');
+        seasonsSection.style.display = 'block'; // Force display
+    } else {
+        console.log('No seasons data available for TV show');
+    }
+    
+    // Don't display similar shows by default for TV - only show if explicitly requested
+    // Hide the similar section for TV shows
+    if (elements.similarSection) {
+        elements.similarSection.classList.add('hidden');
+    }
+    
+    // Display watch providers if available
+    if (details.watch_providers && details.watch_providers.providers) {
+        displayWatchProviders(details.watch_providers);
+    }
+    
+    // Store current trailer if available
+    if (details.videos && details.videos.length > 0) {
+        currentTrailer = details.videos[0];
+    }
+    
+    elements.movieDisplay.classList.remove('hidden');
     moveAgentToCorner();
+}
+
+function displayTVSearchResults(data) {
+    clearAllDisplays();
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'TV Show Search Results';
+    elements.moviesGrid.innerHTML = '';
+    
+    data.results.forEach((show, index) => {
+        const card = createTVCard(show, index + 1);
+        elements.moviesGrid.appendChild(card);
+    });
+    
+    moveAgentToCorner();
+}
+
+function displayTrendingTV(data) {
+    clearAllDisplays();
+    
+    // Clear the default background when showing trending TV content
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'Trending TV Shows This Week';
+    elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class name
+    
+    // Display all trending TV shows in a grid with position numbers
+    if (data && data.results) {
+        data.results.forEach((show, index) => {
+            const card = createTVCard(show, index + 1);
+            elements.moviesGrid.appendChild(card);
+        });
+    }
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+}
+
+function displaySeasonDetails(data) {
+    clearAllDisplays();
+    hideAllSections();
+    
+    // Clear the default background when showing season content
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
+    // Display season details as a list of episodes
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = `${data.name || 'Season Details'}`;
+    elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'episode-list'; // Use different styling for episodes
+    
+    if (data.episodes && Array.isArray(data.episodes)) {
+        data.episodes.forEach((episode, index) => {
+            const episodeCard = document.createElement('div');
+            episodeCard.className = 'episode-card';
+            episodeCard.style.position = 'relative';
+            
+            // Add episode number badge
+            const badge = document.createElement('div');
+            badge.style.cssText = 'position: absolute; top: 10px; left: 10px; background: rgba(229, 9, 20, 0.9); color: white; padding: 6px 10px; border-radius: 16px; font-size: 0.9rem; font-weight: bold; z-index: 1;';
+            badge.textContent = `E${episode.episode_number || index + 1}`;
+            episodeCard.appendChild(badge);
+            
+            // Episode thumbnail
+            if (episode.still_path) {
+                const thumbnail = document.createElement('img');
+                thumbnail.src = episode.still_path;
+                thumbnail.alt = episode.name || `Episode ${episode.episode_number}`;
+                thumbnail.className = 'episode-thumbnail';
+                thumbnail.onerror = function() { this.src = PLACEHOLDER_POSTER; };
+                episodeCard.appendChild(thumbnail);
+            }
+            
+            // Episode info
+            const info = document.createElement('div');
+            info.className = 'episode-info';
+            
+            const title = document.createElement('h3');
+            title.className = 'episode-title';
+            title.textContent = `${episode.episode_number}. ${episode.name || `Episode ${episode.episode_number}`}`;
+            info.appendChild(title);
+            
+            if (episode.air_date) {
+                const airDate = document.createElement('div');
+                airDate.className = 'episode-air-date';
+                airDate.textContent = `Aired: ${new Date(episode.air_date).toLocaleDateString()}`;
+                info.appendChild(airDate);
+            }
+            
+            if (episode.runtime) {
+                const runtime = document.createElement('div');
+                runtime.className = 'episode-runtime';
+                runtime.textContent = `${episode.runtime} minutes`;
+                info.appendChild(runtime);
+            }
+            
+            if (episode.overview) {
+                const overview = document.createElement('p');
+                overview.className = 'episode-overview';
+                overview.textContent = episode.overview;
+                info.appendChild(overview);
+            }
+            
+            if (episode.vote_average) {
+                const rating = document.createElement('div');
+                rating.className = 'episode-rating';
+                rating.innerHTML = `⭐ ${episode.vote_average.toFixed(1)}/10`;
+                info.appendChild(rating);
+            }
+            
+            episodeCard.appendChild(info);
+            elements.moviesGrid.appendChild(episodeCard);
+        });
+    } else {
+        // Fallback if no episodes data
+        const noData = document.createElement('div');
+        noData.className = 'no-data-message';
+        noData.textContent = 'No episode information available';
+        elements.moviesGrid.appendChild(noData);
+    }
+    
+    moveAgentToCorner();
+}
+
+function createTVCard(show, position = null) {
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    card.style.position = 'relative';
+    
+    const firstAirYear = show.first_air_date ? ` (${new Date(show.first_air_date).getFullYear()})` : '';
+    
+    // Add position number badge if provided
+    const positionBadge = position ? `
+        <div style="position: absolute; top: 10px; right: 10px; background: rgba(229, 9, 20, 0.9); color: white; padding: 6px; border-radius: 50%; font-size: 1rem; font-weight: bold; z-index: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+            ${position}
+        </div>` : '';
+    
+    card.innerHTML = `
+        ${positionBadge}
+        <img src="${show.poster_path || PLACEHOLDER_POSTER}" alt="${show.name}" class="movie-card-poster" onerror="this.src='${PLACEHOLDER_POSTER}'">
+        <div class="movie-card-title">
+            ${show.name}
+            <div class="movie-card-year">${firstAirYear}</div>
+        </div>
+    `;
+    
+    // Store ID as data attribute for debugging
+    card.dataset.tvId = show.id;
+    
+    return card;
+}
+
+function createPersonCard(person, position = null) {
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    card.style.position = 'relative';
+    
+    const knownFor = person.known_for_department || 'Unknown';
+    const knownForMovies = person.known_for && person.known_for.length > 0 
+        ? person.known_for.map(item => item.title || item.name).slice(0, 2).join(', ')
+        : '';
+    
+    // Add position number badge if provided
+    const positionBadge = position ? `
+        <div style="position: absolute; top: 10px; right: 10px; background: rgba(229, 9, 20, 0.9); color: white; padding: 6px; border-radius: 50%; font-size: 1rem; font-weight: bold; z-index: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+            ${position}
+        </div>` : '';
+    
+    card.innerHTML = `
+        ${positionBadge}
+        <img src="${person.profile_path ? `https://image.tmdb.org/t/p/w500${person.profile_path}` : PLACEHOLDER_PROFILE}" alt="${person.name}" class="movie-card-poster" onerror="this.src='${PLACEHOLDER_PROFILE}'">
+        <div class="movie-card-title">
+            ${person.name}
+            <div class="movie-card-year">${knownFor}</div>
+            ${knownForMovies ? `<div style="font-size: 0.8em; color: #999; margin-top: 4px;">${knownForMovies}</div>` : ''}
+        </div>
+    `;
+    
+    // Store ID as data attribute for debugging
+    card.dataset.personId = person.id;
+    
+    return card;
+}
+
+function displayMultiSearchResults(data) {
+    clearAllDisplays();
+    hideAllSections();
+    
+    // Clear the default background
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = 'none';
+    }
+    
+    // Move agent to corner
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'Search Results (Movies & TV Shows)';
+    elements.moviesGrid.innerHTML = '';
+    
+    if (data.results) {
+        data.results.forEach((item, index) => {
+            let card;
+            const position = index + 1; // Add position for numbering
+            if (item.media_type === 'tv') {
+                card = createTVCard(item, position);
+            } else if (item.media_type === 'movie') {
+                card = createMovieCard(item, position);
+            } else if (item.media_type === 'person') {
+                // Could create a person card in future
+                return;
+            }
+            if (card) {
+                // Add a media type badge
+                const badge = document.createElement('div');
+                badge.className = 'media-type-badge';
+                badge.textContent = item.media_type === 'tv' ? 'TV' : 'Movie';
+                badge.style.cssText = 'position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; z-index: 1;';
+                card.style.position = 'relative';
+                card.appendChild(badge);
+                elements.moviesGrid.appendChild(card);
+            }
+        });
+    }
 }
 
 function displayPersonDetails(person) {
@@ -562,14 +1152,15 @@ function displayPersonDetails(person) {
     // Create a header section for person info
     const headerHTML = `
         <div style="display: flex; gap: 30px; margin-bottom: 40px; padding: 20px; background: rgba(0,0,0,0.5); border-radius: 12px;">
-            <img src="${person.profile_path || '/assets/no-profile.jpg'}" 
-                 style="width: 200px; height: 300px; object-fit: cover; border-radius: 8px;">
+            <img src="${person.profile_path || PLACEHOLDER_PROFILE}" 
+                 style="width: 200px; height: 300px; object-fit: cover; border-radius: 8px;"
+                 onerror="this.src='${PLACEHOLDER_PROFILE}'">
             <div style="flex: 1;">
-                <h2 style="font-size: 2.5rem; margin-bottom: 10px;">${person.name}</h2>
-                <p style="color: var(--accent); margin-bottom: 10px;">${person.known_for_department || ''}</p>
-                ${person.birthday ? `<p style="margin-bottom: 10px;">Born: ${person.birthday}${person.deathday ? ` - Died: ${person.deathday}` : ''}</p>` : ''}
-                ${person.total_movie_count ? `<p style="margin-bottom: 15px;">Total Movies: ${person.total_movie_count}</p>` : ''}
-                <p style="line-height: 1.6; max-height: 150px; overflow-y: auto;">${person.biography || 'No biography available.'}</p>
+                <h2 style="font-size: 2rem; margin-bottom: 10px;">${person.name}</h2>
+                <p style="color: var(--accent); margin-bottom: 10px; font-size: 0.95rem;">${person.known_for_department || ''}</p>
+                ${person.birthday ? `<p style="margin-bottom: 10px; font-size: 0.9rem;">Born: ${person.birthday}${person.deathday ? ` - Died: ${person.deathday}` : ''}</p>` : ''}
+                ${person.total_movie_count ? `<p style="margin-bottom: 15px; font-size: 0.9rem;">Total Movies: ${person.total_movie_count}</p>` : ''}
+                <p style="line-height: 1.5; max-height: 200px; overflow-y: auto; font-size: 0.85rem; color: rgba(255,255,255,0.8);">${person.biography || 'No biography available.'}</p>
             </div>
         </div>
     `;
@@ -655,15 +1246,24 @@ function displayWatchProviders(data) {
 }
 
 // Helper Functions
-function createMovieCard(movie, isCarousel = false) {
+function createMovieCard(movie, position = null) {
     const card = document.createElement('div');
     card.className = 'movie-card';
+    card.style.position = 'relative';
+    
+    // Add position number badge if provided
+    if (position) {
+        const badge = document.createElement('div');
+        badge.style.cssText = 'position: absolute; top: 10px; right: 10px; background: rgba(229, 9, 20, 0.9); color: white; padding: 6px; border-radius: 50%; font-size: 1rem; font-weight: bold; z-index: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;';
+        badge.textContent = position;
+        card.appendChild(badge);
+    }
     
     const poster = document.createElement('img');
-    poster.src = movie.poster_path || '';
+    poster.src = movie.poster_path || PLACEHOLDER_POSTER;
     poster.alt = movie.title;
     poster.className = 'movie-card-poster';
-    poster.onerror = function() { this.style.display = 'none'; };
+    poster.onerror = function() { this.src = PLACEHOLDER_POSTER; };
     
     const title = document.createElement('div');
     title.className = 'movie-card-title';
@@ -679,6 +1279,9 @@ function createMovieCard(movie, isCarousel = false) {
     
     card.appendChild(poster);
     card.appendChild(title);
+    
+    // Store ID as data attribute for debugging
+    card.dataset.movieId = movie.id;
     
     // No click handler - browser can't send events to AI
     
@@ -740,11 +1343,23 @@ function clearAllDisplays() {
     // Don't move agent back to center - it should stay in corner once content has been shown
     // Only move back to center on disconnect
     elements.trailerFrame.src = '';
-    // Reset the background to default
+    
+    // Clear any dynamically created seasons section
+    const seasonsSection = document.getElementById('seasonsSection');
+    if (seasonsSection) {
+        seasonsSection.remove();
+    }
+    
+    // Reset the background to default background.png
     document.body.style.backgroundImage = '';
     document.body.style.backgroundSize = '';
     document.body.style.backgroundPosition = '';
     document.body.style.backgroundAttachment = '';
+    if (elements.appContainer) {
+        elements.appContainer.style.backgroundImage = "url('/background.png')";
+        elements.appContainer.style.backgroundSize = 'cover';
+        elements.appContainer.style.backgroundPosition = 'center';
+    }
 }
 
 // Trailer Functions
@@ -797,4 +1412,66 @@ function showLoading() {
 
 function hideLoading() {
     elements.loadingState.classList.add('hidden');
+}
+
+// Display function for person search results
+function displayPersonSearchResults(data) {
+    clearAllDisplays();
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'People Search Results';
+    elements.moviesGrid.innerHTML = '';
+    
+    data.results.forEach((person, index) => {
+        const card = createPersonCard(person, index + 1);
+        elements.moviesGrid.appendChild(card);
+    });
+}
+
+// Display function for genre movies
+function displayGenreMovies(data) {
+    clearAllDisplays();
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = `${data.genre} Movies`;
+    elements.moviesGrid.innerHTML = '';
+    
+    data.movies.forEach((movie, index) => {
+        const card = createMovieCard(movie, index + 1);
+        elements.moviesGrid.appendChild(card);
+    });
+}
+
+// Display function for discover results
+function displayDiscoverResults(data, contentType) {
+    clearAllDisplays();
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = contentType === 'movie' ? 'Discover Movies' : 'Discover TV Shows';
+    elements.moviesGrid.innerHTML = '';
+    
+    data.results.forEach((item, index) => {
+        const card = contentType === 'movie' ? 
+            createMovieCard(item, index + 1) : 
+            createTVCard(item, index + 1);
+        elements.moviesGrid.appendChild(card);
+    });
+}
+
+// Display function for similar TV shows
+function displaySimilarTV(data) {
+    clearAllDisplays();
+    hideAllSections();
+    elements.searchResults.classList.remove('hidden');
+    elements.searchTitle.textContent = 'Similar TV Shows';
+    elements.moviesGrid.innerHTML = '';
+    
+    if (data.items && data.items.length > 0) {
+        data.items.forEach((show, index) => {
+            const card = createTVCard(show, index + 1);
+            elements.moviesGrid.appendChild(card);
+        });
+    } else {
+        elements.moviesGrid.innerHTML = '<p class="no-results">No similar TV shows found</p>';
+    }
 }
