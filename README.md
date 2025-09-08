@@ -102,7 +102,7 @@ export PORT=3030  # Optional, defaults to 3030
 
 5. **Run the application**
 ```bash
-python movie_agent.py
+python cinebot_agent.py
 ```
 
 6. **Access the interface**
@@ -191,7 +191,7 @@ Events flow one-way from backend to frontend:
 
 ### Customization
 
-**Voice Settings** (in `movie_agent.py`):
+**Voice Settings** (in `cinebot_agent.py`):
 ```python
 self.add_language(
     name="English",
@@ -221,7 +221,7 @@ Each state has specific allowed functions and valid transitions.
 ### Project Structure
 ```
 sigmond-cinebot/
-├── movie_agent.py       # Main AI agent implementation
+├── cinebot_agent.py       # Main AI agent implementation
 ├── tmdb_client.py       # TMDB API client with caching
 ├── requirements.txt     # Python dependencies
 ├── web/
@@ -235,15 +235,15 @@ sigmond-cinebot/
 
 ### Adding New Features
 
-1. **New SWAIG Function**: Add to `_setup_functions()` in `movie_agent.py`
+1. **New SWAIG Function**: Add to `_setup_functions()` in `cinebot_agent.py`
 2. **New Event Type**: Add handler in `handleAgentEvent()` in `app.js`
 3. **New Display Mode**: Create display function in `app.js`
-4. **New State**: Add to state machine in `movie_agent.py`
+4. **New State**: Add to state machine in `cinebot_agent.py`
 
 ### Testing
 ```bash
 # Run with debug logging
-python movie_agent.py
+python cinebot_agent.py
 
 # Test TMDB connection
 python -c "from tmdb_client import TMDBClient; client = TMDBClient(); print(client.search_movie('Star Wars'))"
@@ -268,7 +268,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY . .
-CMD ["python", "movie_agent.py"]
+CMD ["python", "cinebot_agent.py"]
 ```
 
 ## Troubleshooting
