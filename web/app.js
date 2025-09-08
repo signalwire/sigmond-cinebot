@@ -276,10 +276,15 @@ function handleDisconnect() {
         elements.welcomeScreen.style.display = 'flex';
     }
     
-    // Update buttons
+    // Update buttons and restore connect button with icon
     elements.connectBtn.style.display = 'flex';
     elements.connectBtn.disabled = false;
-    elements.connectBtn.textContent = 'Connect to CineBot';
+    elements.connectBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M8 5v14l11-7z" fill="currentColor"/>
+        </svg>
+        Connect to CineBot
+    `;
     elements.hangupBtn.style.display = 'none';
     
     // Quick actions removed
