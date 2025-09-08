@@ -11,27 +11,7 @@
 </head>
 <body>
     <!-- Main Container -->
-    <div class="app-container">
-        
-        <!-- Connection Controls -->
-        <div class="connection-controls">
-            <button id="connectBtn" class="control-btn connect-btn">
-                <svg viewBox="0 0 24 24" width="20" height="20">
-                    <path d="M8 5v14l11-7z" fill="currentColor"/>
-                </svg>
-                Connect to CineBot
-            </button>
-            <button id="hangupBtn" class="control-btn hangup-btn" style="display: none;">
-                <svg viewBox="0 0 24 24" width="20" height="20">
-                    <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.68.28-.3 0-.55-.13-.74-.33l-3.46-3.45c-.17-.17-.26-.39-.26-.63 0-.24.09-.46.26-.63C3.15 7.05 7.46 5 12 5s8.85 2.05 12.7 5.86c.17.17.26.39.26.63 0 .24-.09.46-.26.63l-3.46 3.45c-.19.2-.45.33-.74.33-.25 0-.5-.1-.68-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" fill="currentColor"/>
-                </svg>
-                Disconnect
-            </button>
-            <div id="connectionStatus" class="connection-status" style="display: none;">
-                <div class="status-indicator"></div>
-                <span id="statusText"></span>
-            </div>
-        </div>
+    <div class="app-container" style="background-image: url('/background.png'); background-size: cover; background-position: center;">
         
         <!-- Agent Video Container - Centered by default, moves to corner when content shown -->
         <div id="agentContainer" class="agent-container centered">
@@ -39,6 +19,28 @@
                 <div id="videoContainer" class="video-container">
                     <!-- Video element added dynamically -->
                 </div>
+            </div>
+        </div>
+        
+        <!-- Connection Controls - Bottom of page -->
+        <div class="connection-controls-container">
+            <button id="connectBtn" class="control-btn connect-btn">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path d="M8 5v14l11-7z" fill="currentColor"/>
+                </svg>
+                <span>Connect to CineBot</span>
+            </button>
+            <button id="hangupBtn" class="control-btn hangup-btn" style="display: none;">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.68.28-.3 0-.55-.13-.74-.33l-3.46-3.45c-.17-.17-.26-.39-.26-.63 0-.24.09-.46.26-.63C3.15 7.05 7.46 5 12 5s8.85 2.05 12.7 5.86c.17.17.26.39.26.63 0 .24-.09.46-.26.63l-3.46 3.45c-.19.2-.45.33-.74.33-.25 0-.5-.1-.68-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" fill="currentColor"/>
+                </svg>
+                <span>Disconnect</span>
+            </button>
+            
+            <!-- Connection Status -->
+            <div id="connectionStatus" class="connection-status" style="display: none;">
+                <div class="status-pulse"></div>
+                <span id="statusText"></span>
             </div>
         </div>
 

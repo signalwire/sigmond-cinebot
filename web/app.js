@@ -203,7 +203,20 @@ async function connect() {
         
         updateStatus(errorMessage, 'error');
         elements.connectBtn.disabled = false;
-        elements.connectBtn.textContent = 'Connect to CineBot';
+        // Restore button with icon on error
+        elements.connectBtn.innerHTML = '';
+        const playIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        playIcon.setAttribute('viewBox', '0 0 24 24');
+        playIcon.setAttribute('width', '18');
+        playIcon.setAttribute('height', '18');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M8 5v14l11-7z');
+        path.setAttribute('fill', 'currentColor');
+        playIcon.appendChild(path);
+        elements.connectBtn.appendChild(playIcon);
+        const span = document.createElement('span');
+        span.textContent = 'Connect to CineBot';
+        elements.connectBtn.appendChild(span);
         
         // Reset state
         client = null;
@@ -279,12 +292,20 @@ function handleDisconnect() {
     // Update buttons and restore connect button with icon
     elements.connectBtn.style.display = 'flex';
     elements.connectBtn.disabled = false;
-    elements.connectBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="20" height="20">
-            <path d="M8 5v14l11-7z" fill="currentColor"/>
-        </svg>
-        Connect to CineBot
-    `;
+    // Clear and rebuild connect button
+    elements.connectBtn.innerHTML = '';
+    const playIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    playIcon.setAttribute('viewBox', '0 0 24 24');
+    playIcon.setAttribute('width', '18');
+    playIcon.setAttribute('height', '18');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M8 5v14l11-7z');
+    path.setAttribute('fill', 'currentColor');
+    playIcon.appendChild(path);
+    elements.connectBtn.appendChild(playIcon);
+    const span = document.createElement('span');
+    span.textContent = 'Connect to CineBot';
+    elements.connectBtn.appendChild(span);
     elements.hangupBtn.style.display = 'none';
     
     // Quick actions removed

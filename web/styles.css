@@ -43,38 +43,48 @@ body {
     display: none !important;
 }
 
-/* Connection Controls */
-.connection-controls {
+/* Connection Controls Container - Bottom of page */
+.connection-controls-container {
     position: fixed;
-    top: 20px;
-    left: 20px;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 2000;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
 }
 
 .control-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 12px 24px;
-    border: none;
+    padding: 10px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 25px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
     color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
 }
 
 .connect-btn {
-    background: var(--success);
+    background: linear-gradient(135deg, rgba(70, 211, 105, 0.9), rgba(70, 211, 105, 0.7));
+    border-color: rgba(70, 211, 105, 0.5);
 }
 
 .connect-btn:hover:not(:disabled) {
-    background: #3cb55c;
-    transform: scale(1.05);
+    background: linear-gradient(135deg, rgba(70, 211, 105, 1), rgba(70, 211, 105, 0.8));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(70, 211, 105, 0.4);
 }
 
 .connect-btn:disabled {
@@ -83,22 +93,48 @@ body {
 }
 
 .hangup-btn {
-    background: var(--accent);
+    background: linear-gradient(135deg, rgba(229, 9, 20, 0.9), rgba(229, 9, 20, 0.7));
+    border-color: rgba(229, 9, 20, 0.5);
 }
 
 .hangup-btn:hover {
-    background: var(--accent-hover);
-    transform: scale(1.05);
+    background: linear-gradient(135deg, rgba(229, 9, 20, 1), rgba(229, 9, 20, 0.8));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.4);
 }
 
 .connection-status {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 20px;
+    gap: 8px;
+    padding: 6px 14px;
     background: rgba(0, 0, 0, 0.7);
-    border-radius: 25px;
-    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.3px;
+}
+
+.status-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.status-pulse.connecting {
+    background: var(--warning);
+}
+
+.status-pulse.error {
+    background: var(--accent);
 }
 
 /* Welcome Screen */
@@ -165,17 +201,20 @@ body {
     width: 100%;
     height: 100%;
     position: relative;
-    background: #000;
+    background: transparent;
     border-radius: 20px;
-    overflow: hidden;
-    box-shadow: var(--shadow-xl);
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    overflow: visible;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
 }
 
 .agent-container.corner .agent-video-wrapper {
+    border-radius: 12px;
+}
+
+.agent-container.corner .video-container {
     border-radius: 12px;
 }
 
@@ -186,6 +225,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    overflow: hidden;
 }
 
 .video-container video,
@@ -214,15 +258,10 @@ body {
     padding: 0 !important;
 }
 
-/* Hide any SignalWire control overlays or buttons */
-.video-container button,
-.video-container .controls,
-.video-container [class*="control"],
-.video-container [class*="overlay"],
-.agent-video-wrapper button,
-.agent-video-wrapper .controls {
-    display: none !important;
-}
+/* Hide SignalWire's own controls but allow our custom overlay */
+.video-container > button:not(.control-btn),
+.video-container > .controls:not(.connection-controls-overlay),
+.video-container > [class*="control"]:not(.connection-controls-overlay):not(.control-btn):not(.connection-status),
 
 .agent-status {
     display: none !important; /* Hide status indicators */
@@ -974,6 +1013,15 @@ body {
     .agent-container.corner {
         width: 160px;
         height: 120px;
+    }
+    
+    .connection-controls-container {
+        bottom: 20px;
+    }
+    
+    .control-btn {
+        padding: 8px 16px;
+        font-size: 0.85rem;
     }
     
     .quick-actions {
