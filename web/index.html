@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineBot - Your AI Movie Companion</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Main Container -->
+    <div class="app-container">
+        
+        <!-- Connection Controls -->
+        <div class="connection-controls">
+            <button id="connectBtn" class="control-btn connect-btn">
+                <svg viewBox="0 0 24 24" width="20" height="20">
+                    <path d="M8 5v14l11-7z" fill="currentColor"/>
+                </svg>
+                Connect to CineBot
+            </button>
+            <button id="hangupBtn" class="control-btn hangup-btn" style="display: none;">
+                <svg viewBox="0 0 24 24" width="20" height="20">
+                    <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.68.28-.3 0-.55-.13-.74-.33l-3.46-3.45c-.17-.17-.26-.39-.26-.63 0-.24.09-.46.26-.63C3.15 7.05 7.46 5 12 5s8.85 2.05 12.7 5.86c.17.17.26.39.26.63 0 .24-.09.46-.26.63l-3.46 3.45c-.19.2-.45.33-.74.33-.25 0-.5-.1-.68-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" fill="currentColor"/>
+                </svg>
+                Disconnect
+            </button>
+            <div id="connectionStatus" class="connection-status" style="display: none;">
+                <div class="status-indicator"></div>
+                <span id="statusText"></span>
+            </div>
+        </div>
+        
+        <!-- Agent Video Container - Centered by default, moves to corner when content shown -->
+        <div id="agentContainer" class="agent-container centered">
+            <div class="agent-video-wrapper">
+                <div id="videoContainer" class="video-container">
+                    <!-- Video element added dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Movie Display Section - Hidden by default -->
+        <div id="movieDisplay" class="movie-display hidden">
+            <!-- Background with movie backdrop -->
+            <div class="movie-backdrop-container">
+                <img id="movieBackdrop" class="movie-backdrop" src="" alt="">
+                <div class="backdrop-gradient"></div>
+            </div>
+
+            <!-- Main Movie Content -->
+            <div class="movie-content">
+                <div class="movie-primary">
+                    <img id="moviePoster" class="movie-poster" src="" alt="">
+                    
+                    <div class="movie-info">
+                        <h1 id="movieTitle" class="movie-title"></h1>
+                        <p id="movieTagline" class="movie-tagline"></p>
+                        
+                        <div class="movie-meta">
+                            <span class="movie-year" id="movieYear"></span>
+                            <span class="movie-runtime" id="movieRuntime"></span>
+                            <span class="movie-rating">
+                                <svg class="star-icon" viewBox="0 0 24 24">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                </svg>
+                                <span id="movieRating"></span>
+                            </span>
+                        </div>
+
+                        <div class="movie-genres" id="movieGenres"></div>
+                        
+                        <p id="movieOverview" class="movie-overview"></p>
+
+                        <!-- Movie actions info -->
+                        <div class="movie-actions-info">
+                            <p class="action-hint">Ask me to play the trailer or show cast details!</p>
+                        </div>
+
+                        <!-- Watch Providers -->
+                        <div class="watch-providers hidden" id="watchProviders">
+                            <h3>Where to Watch</h3>
+                            <div class="providers-grid" id="providersGrid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cast Section -->
+                <div class="cast-section hidden" id="castSection">
+                    <h2>Cast & Crew</h2>
+                    <div class="cast-carousel" id="castCarousel"></div>
+                </div>
+
+                <!-- Similar Movies -->
+                <div class="similar-section hidden" id="similarSection">
+                    <h2>You Might Also Like</h2>
+                    <div class="movies-carousel" id="similarCarousel"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Results Grid - Hidden by default -->
+        <div id="searchResults" class="search-results hidden">
+            <h2 id="searchTitle" class="results-title">Search Results</h2>
+            <div class="movies-grid" id="moviesGrid"></div>
+        </div>
+
+        <!-- Trending Movies - Hidden by default -->
+        <div id="trendingSection" class="trending-section hidden">
+            <h2 class="trending-title">Trending This Week</h2>
+            <div class="trending-carousel" id="trendingCarousel"></div>
+        </div>
+
+        <!-- Person Details - Hidden by default -->
+        <div id="personDisplay" class="person-display hidden">
+            <div class="person-backdrop"></div>
+            <div class="person-content">
+                <img id="personPhoto" class="person-photo" src="" alt="">
+                <div class="person-info">
+                    <h1 id="personName" class="person-name"></h1>
+                    <p id="personDepartment" class="person-department"></p>
+                    <p id="personBirthday" class="person-birthday"></p>
+                    <p id="personBio" class="person-biography"></p>
+                    
+                    <div class="filmography-section">
+                        <h2>Known For</h2>
+                        <div class="filmography-carousel" id="filmographyCarousel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trailer Modal -->
+        <div id="trailerModal" class="trailer-modal hidden">
+            <div class="modal-content">
+                <button class="close-btn" id="closeTrailerBtn">×</button>
+                <div class="trailer-wrapper">
+                    <iframe id="trailerFrame" src="" frameborder="0" allowfullscreen></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state hidden">
+            <div class="loading-spinner"></div>
+        </div>
+
+    </div>
+
+    <!-- SignalWire SDK from CDN -->
+    <script src="https://cdn.signalwire.com/@signalwire/client"></script>
+    <!-- Load app -->
+    <script src="app.js"></script>
+</body>
+</html>
