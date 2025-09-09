@@ -540,7 +540,19 @@ class MovieAgent(AgentBase):
                 if details["overview"]:
                     response += f"Here's what it's about: {details['overview'][:200]}... "
                 
-                response += "You can ask me to play the trailer, find similar movies, or tell you about the cast members shown on screen."
+                # Check if trailer is available before offering it
+                has_trailer = False
+                if details.get("videos"):
+                    has_trailer = any(v["type"] == "Trailer" for v in details["videos"])
+                
+                # Build options based on available content
+                options = []
+                if has_trailer:
+                    options.append("play the trailer")
+                options.append("find similar movies")
+                options.append("tell you about the cast members shown on screen")
+                
+                response += f"You can ask me to {', or '.join(options)}."
                 
                 result = SwaigFunctionResult(response=response)
                 
@@ -1662,7 +1674,20 @@ class MovieAgent(AgentBase):
                 if details["overview"]:
                     response += f"Here's what it's about: {details['overview'][:200]}... "
                 
-                response += "You can ask me about specific seasons, find similar shows, or explore the cast members shown on screen."
+                # Check if trailer is available before offering it
+                has_trailer = False
+                if details.get("videos"):
+                    has_trailer = any(v["type"] == "Trailer" for v in details["videos"])
+                
+                # Build options based on available content
+                options = []
+                if has_trailer:
+                    options.append("watch the trailer")
+                options.append("ask about specific seasons")
+                options.append("find similar shows")
+                options.append("explore the cast members shown on screen")
+                
+                response += f"You can {', or '.join(options)}."
                 
                 result = SwaigFunctionResult(response=response)
                 

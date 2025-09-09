@@ -168,7 +168,10 @@ class TMDBClient:
                     "key": video["key"],
                     "name": video["name"],
                     "type": video["type"],
-                    "site": video["site"]
+                    "site": video["site"],
+                    "size": video.get("size", 720),  # Video quality: 360, 480, 720, 1080
+                    "official": video.get("official", False),
+                    "published_at": video.get("published_at", "")
                 }
                 for video in info["videos"].get("results", [])
                 if video["site"] == "YouTube"
@@ -520,7 +523,10 @@ class TMDBClient:
                     "key": video["key"],
                     "name": video["name"],
                     "type": video["type"],
-                    "site": video["site"]
+                    "site": video["site"],
+                    "size": video.get("size", 720),  # Video quality: 360, 480, 720, 1080
+                    "official": video.get("official", False),
+                    "published_at": video.get("published_at", "")
                 }
                 for video in info["videos"].get("results", [])
                 if video["site"] == "YouTube"
@@ -1066,9 +1072,11 @@ class TMDBClient:
             return cached
         
         if content_type == "movie":
-            movie = tmdb.Movie(content_id)
-            recs = movie.recommendations()
+            # Use the Movies class to get recommendations
+            movies = tmdb.Movies(content_id)
+            recs = movies.recommendations()
         else:
+            # Use the TV class to get recommendations
             tv = tmdb.TV(content_id)
             recs = tv.recommendations()
         

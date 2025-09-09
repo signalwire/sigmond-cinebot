@@ -1,5 +1,6 @@
 // SignalWire WebRTC Configuration
 const STATIC_TOKEN = 'eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiU0FUIiwiY2giOiJwdWMuc2lnbmFsd2lyZS5jb20ifQ..arsTAToqHlmZIcfC.5iqzbQj5ojJlZjzKqkM1NjwX2W8XpBIVgV0R6f4irFqMuv6HWwLviXga9XoK7PAA5zeNIJtNzbAhqzwfL2vAnp8rdfj4g5beRWDs8p0pNnII7KNwC1RJ4vDAI_0chSnvngMeQ901AgxqGQ6RnoKq-fqzq-Fexq9B--lD-SRUth2U57FkQZWO6ae3O5EyaqC5G6Is7x6Lr-vXt-h6fHltriAemODYo5aVBoVMVxZc-qXd0I6sSUkuLcokd6iUoM5IPW9z-9YwjFMVV--eO0fhyYCKroR_j4kZWfgPIVNrhr4hLBwhUlGcTF4gdqcSXse7gCr74EzZSueXf-a-DooYoj_p4cYXTxh6mZSNMsg1ptDdoYUS41-NlRTsenNzbGuT5_K62eX59igL_W8VPdZ1P_bXy0ezkj_05XbUGO9P4TgOSEoBZ0Eobma_M0hFJwECkhXylrjv1WGVCseQ6-NyYX--J0o8bNs-UHpbbhNkOy1tJvn7KtT8IQZ0ud4OhgtP_V1wGC58O8b4zmTMTbCTYRRqLY65wS8bLH0mhSKM.yf0tegw6KLIb-QoPDssk-Q';
+const STAGING_TOKEN ='eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiU0FUIiwiY2giOiJwdWMuc3dpcmUuaW8ifQ..WCc8swuxsYcz3HDJ.mnwf55kc1eGD7Rs9RIMucZ4LXBDxvFg7n5tOq0rPAPsu5WsZxia78tUPrplnmY4N9pI6HaM_EMa7ZW95FdrFbE2rZ9uw_8AMMt6YgHWF-EiUpLBWzap_bOPM_UHBkVgqkH0fqryziYmSxnxj118cLSlJAHjagqYNiwPAgEAjMAHUDWUtaa3X4K8SpMzhcV1iv5SNrafykTI_B_4X86zEyyr0MpgKG37cc6LlQ3bT1nLqA7l7VRK6siZsM6mAUwUv8g7BQt2P2HaXh41ZMl4f7qJhL0urAcItFv476kCu85IyajT8NmV08tk3kMLKl3KO0RUL3dLCx5gVf1Lgf978PIs7GqBjWRRcm5pIsk4YWt8OcskmV6h1_H4tX6emSIezgzYxvdB5IbFTrEm03SBSOd8uFnlmmO5erDg4qATymjGb59x5oRxrlsGCUXoYo0DnLFh2toyfNZf9-6dUBbMt_5jcsXZbrI64H6u6K2Ccn9tVYWt9G-KI0x1P0nxllM-spg_DLxgZ1M9gs80fgIzheYS5nAgXIJsXIJ3Qgk7Y.IFXYYyiiL9bj8q-XDZ9Lmw'
 const DESTINATION = '/public/cinebot';
 
 // Global state
@@ -135,6 +136,7 @@ async function connect() {
         client = await window.SignalWire.SignalWire({
             token: STATIC_TOKEN,
             logLevel: 'debug'
+            //host: 'relay.swire.io'
         });
         
         console.log('Client initialized, subscribing to events...');
@@ -1146,6 +1148,12 @@ function displayPersonDetails(person) {
     clearAllDisplays();
     hideAllSections();
     
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
     // Use the search results section to display person with all their movies
     elements.searchResults.classList.remove('hidden');
     
@@ -1206,6 +1214,7 @@ function displayGenreMovies(data) {
     elements.searchResults.classList.remove('hidden');
     elements.searchTitle.textContent = `${data.genre} Movies`;
     elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class
     
     data.movies.forEach(movie => {
         const card = createMovieCard(movie);
@@ -1342,7 +1351,12 @@ function clearAllDisplays() {
     hideAllSections();
     // Don't move agent back to center - it should stay in corner once content has been shown
     // Only move back to center on disconnect
-    elements.trailerFrame.src = '';
+    
+    // Close trailer modal if open
+    if (elements.trailerModal && !elements.trailerModal.classList.contains('hidden')) {
+        elements.trailerModal.classList.add('hidden');
+        elements.trailerFrame.src = '';
+    }
     
     // Clear any dynamically created seasons section
     const seasonsSection = document.getElementById('seasonsSection');
@@ -1368,7 +1382,26 @@ let currentTrailer = null;
 function playTrailer(video) {
     const trailerVideo = video || currentTrailer;
     if (trailerVideo) {
-        elements.trailerFrame.src = `https://www.youtube.com/embed/${trailerVideo.key}?autoplay=1`;
+        // YouTube embed parameters:
+        // autoplay=1 - Start playing automatically
+        // mute=1 - Start muted (required for autoplay in most browsers)
+        // controls=1 - Show video controls
+        // rel=0 - Don't show related videos at the end
+        // modestbranding=1 - Reduce YouTube branding
+        // fs=1 - Allow fullscreen
+        const params = new URLSearchParams({
+            autoplay: 1,
+            mute: 0, // Not muted so user can hear (may prevent autoplay in some browsers)
+            controls: 1,
+            rel: 0,
+            modestbranding: 1,
+            fs: 1,
+            iv_load_policy: 3, // Hide annotations
+            color: 'red', // Red progress bar
+            showinfo: 0 // Hide video title/uploader before playing
+        });
+        
+        elements.trailerFrame.src = `https://www.youtube.com/embed/${trailerVideo.key}?${params.toString()}`;
         elements.trailerModal.classList.remove('hidden');
         currentTrailer = trailerVideo;
     }
@@ -1418,9 +1451,17 @@ function hideLoading() {
 function displayPersonSearchResults(data) {
     clearAllDisplays();
     hideAllSections();
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
     elements.searchResults.classList.remove('hidden');
     elements.searchTitle.textContent = 'People Search Results';
     elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class
     
     data.results.forEach((person, index) => {
         const card = createPersonCard(person, index + 1);
@@ -1432,9 +1473,17 @@ function displayPersonSearchResults(data) {
 function displayGenreMovies(data) {
     clearAllDisplays();
     hideAllSections();
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
     elements.searchResults.classList.remove('hidden');
     elements.searchTitle.textContent = `${data.genre} Movies`;
     elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class
     
     data.movies.forEach((movie, index) => {
         const card = createMovieCard(movie, index + 1);
@@ -1446,9 +1495,17 @@ function displayGenreMovies(data) {
 function displayDiscoverResults(data, contentType) {
     clearAllDisplays();
     hideAllSections();
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
     elements.searchResults.classList.remove('hidden');
     elements.searchTitle.textContent = contentType === 'movie' ? 'Discover Movies' : 'Discover TV Shows';
     elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class
     
     data.results.forEach((item, index) => {
         const card = contentType === 'movie' ? 
@@ -1462,9 +1519,17 @@ function displayDiscoverResults(data, contentType) {
 function displaySimilarTV(data) {
     clearAllDisplays();
     hideAllSections();
+    
+    // Move agent to corner when displaying content
+    if (!isContentDisplayed) {
+        moveAgentToCorner();
+        isContentDisplayed = true;
+    }
+    
     elements.searchResults.classList.remove('hidden');
     elements.searchTitle.textContent = 'Similar TV Shows';
     elements.moviesGrid.innerHTML = '';
+    elements.moviesGrid.className = 'movies-grid'; // Reset class to movies grid
     
     if (data.items && data.items.length > 0) {
         data.items.forEach((show, index) => {
