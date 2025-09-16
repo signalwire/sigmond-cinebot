@@ -1140,7 +1140,7 @@ class MovieAgent(AgentBase):
                     
                     # Log filmography IDs for AI reference
                     filmography_info = f"FILMOGRAPHY for {details['name']} with IDs:\n"
-                    for i, film in enumerate(films[:20], 1):  # Show top 20 for AI
+                    for i, film in enumerate(films[:24], 1):  # Show top 20 for AI
                         year = film.get('release_date', '')[:4] if film.get('release_date') else ''
                         filmography_info += f"  {i}. {film['title']} ({year}) -> movie_id={film['id']}\n"
                     logger.info(f"Person filmography: {filmography_info}")
@@ -1189,7 +1189,7 @@ class MovieAgent(AgentBase):
                             # Log filmography IDs for AI reference
                             films = details.get("filmography", [])
                             filmography_info = f"FILMOGRAPHY for {details['name']} with IDs:\n"
-                            for i, film in enumerate(films[:20], 1):  # Show top 20 for AI
+                            for i, film in enumerate(films[:24], 1):  # Show top 20 for AI
                                 year = film.get('release_date', '')[:4] if film.get('release_date') else ''
                                 filmography_info += f"  {i}. {film['title']} ({year}) -> movie_id={film['id']}\n"
                             logger.info(f"Person filmography: {filmography_info}")
