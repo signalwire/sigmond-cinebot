@@ -2,6 +2,8 @@
 
 CineBot is an intelligent voice-driven movie discovery assistant powered by SignalWire AI Agents and The Movie Database (TMDB). Have natural conversations to explore movies, actors, and get personalized recommendations with a beautiful Netflix-style visual interface.
 
+DEMO https://cinebot.signalwire.me/
+
 ## Features
 
 ### 🎙️ Voice-First Interaction
