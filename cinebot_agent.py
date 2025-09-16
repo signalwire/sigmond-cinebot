@@ -308,7 +308,7 @@ class MovieAgent(AgentBase):
                     movie_descriptions = []
                     self.search_result_mapping = {}  # Reset mapping
                     
-                    for i, m in enumerate(filtered_results[:10], 1):  # Show more results for better matching
+                    for i, m in enumerate(filtered_results[:24], 1):  # Show more results for better matching
                         year = m.get('release_date', '')[:4] if m.get('release_date') else 'unknown year'
                         # Include ID directly in the response text for LLM to see
                         movie_descriptions.append(f"{i}. id: {m['id']} title: '{m['title']}' ({year})")
@@ -775,7 +775,7 @@ class MovieAgent(AgentBase):
                     movie_list = []
                     self.search_result_mapping = {}  # Use same mapping as search
                     
-                    for i, m in enumerate(results["results"][:10], 1):
+                    for i, m in enumerate(results["results"][:24], 1):
                         year = m.get('release_date', '')[:4] if m.get('release_date') else ''
                         movie_list.append(f"{i}. '{m['title']}' ({year}) - Rating: {m['vote_average']:.1f}/10")
                         
@@ -1292,7 +1292,7 @@ class MovieAgent(AgentBase):
             try:
                 results = self.tmdb.get_trending(time_window=time_window)
                 
-                top_movies = results["results"][:10]
+                top_movies = results["results"][:24]
                 movie_list = []
                 self.search_result_mapping = {}  # Use same mapping as search
                 
@@ -1369,7 +1369,7 @@ class MovieAgent(AgentBase):
                 genres = {g["name"].lower(): g["id"] for g in genres_data["genres"]}
                 
                 if genre_name not in genres:
-                    available = ", ".join(list(genres.keys())[:10])
+                    available = ", ".join(list(genres.keys())[:24])
                     result = SwaigFunctionResult(
                         response=f"I don't recognize '{genre_name}'. "
                         f"Try genres like: {available}"
@@ -1379,7 +1379,7 @@ class MovieAgent(AgentBase):
                 genre_id = genres[genre_name]
                 results = self.tmdb.discover_by_genre([genre_id])
                 
-                top_movies = results["results"][:10]
+                top_movies = results["results"][:24]
                 movie_list = []
                 self.search_result_mapping = {}  # Use same mapping as search
                 
@@ -2096,7 +2096,7 @@ class MovieAgent(AgentBase):
             try:
                 results = self.tmdb.get_trending_tv(time_window=time_window)
                 
-                top_shows = results["results"][:10]
+                top_shows = results["results"][:24]
                 show_list = []
                 self.search_result_mapping = {}  # Use same mapping as search
                 
